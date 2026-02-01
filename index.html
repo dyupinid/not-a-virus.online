@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Горящий текст на фоне</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nosifer&family=Rubik+Burned&display=swap" rel="stylesheet">
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Creepster', cursive;
+        }
+
+        #bg-video {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+        }
+
+        #overlay-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff2a00;
+            font-size: 5.8vw;
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 10px #ff4500, 0 0 30px #ff0000, 0 0 60px #ff0000, 0 0 100px #8b0000;
+            -webkit-text-stroke: 1.5px #000;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        #overlay-text.blink {
+            animation: blink 1.5s infinite alternate;
+        }
+
+        @keyframes blink {
+            0%   { opacity: 0.3; transform: scale(0.97); }
+            100% { opacity: 1.0; transform: scale(1.03); }
+        }
+
+        /* Кнопка звука */
+        #sound-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 20;
+            background: rgba(0,0,0,0.7);
+            color: #ff2a00;
+            border: 2px solid #ff4500;
+            padding: 12px 20px;
+            font-family: 'Creepster', cursive;
+            font-size: 1.2em;
+            cursor: pointer;
+            border-radius: 8px;
+            text-shadow: 0 0 8px #ff0000;
+            transition: all 0.3s;
+        }
+        #sound-btn:hover {
+            background: #ff4500;
+            color: #000;
+            box-shadow: 0 0 20px #ff0000;
+        }
+    </style>
+</head>
+<body>
+
+<video id="bg-video" autoplay loop playsinline poster="poster.jpg">
+    <source src="wideo.mp4" type="video/mp4">
+    Ваш браузер не поддерживает видео.
+</video>
+
+<div id="overlay-text">
+    НЕ ОТКРЫВАЙТЕ<br>🔥 СТРАННЫЕ ССЫЛКИ 🔥
+</div>
+
+<!-- Кнопка звука -->
+<button id="sound-btn">🔇 Включить звук</button>
+
+<script>
+// НАСТРОЙКИ
+const SETTINGS = {
+    firstAppearDelay: 5,
+    visibleDuration: 12,
+};
+
+const video = document.getElementById('bg-video');
+const text  = document.getElementById('overlay-text');
+const soundBtn = document.getElementById('sound-btn');
+
+let isVisible = false;
+
+// Переключение звука
+function toggleSound() {
+    video.muted = !video.muted;
+    soundBtn.textContent = video.muted ? '🔇 Включить звук' : '🔊 Выключить звук';
+    soundBtn.style.background = video.muted ? 'rgba(0,0,0,0.7)' : '#ff4500';
+}
+
+// Клик по кнопке
+soundBtn.addEventListener('click', toggleSound);
+
+// Автоматически начинаем с выключенного звука
+video.muted = true;
+
+// Логика текста
+function updateText() {
+    const t = video.currentTime;
+    if (t >= SETTINGS.firstAppearDelay && t < SETTINGS.firstAppearDelay + SETTINGS.visibleDuration) {
+        if (!isVisible) {
+            text.style.opacity = '1';
+            text.classList.add('blink');
+            isVisible = true;
+        }
+    } else {
+        if (isVisible) {
+            text.style.opacity = '0';
+            text.classList.remove('blink');
+            isVisible = false;
+        }
+    }
+}
+
+video.addEventListener('timeupdate', updateText);
+
+// Принудительный запуск (на случай блокировки autoplay)
+video.play().catch(() => {
+    // Если браузер блокирует, кнопка всё равно будет работать
+});
+
+// Мобильные тач
+document.body.addEventListener('touchstart', () => video.play(), { once: true });
+</script>
+</body>
+</html>

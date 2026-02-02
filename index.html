@@ -92,33 +92,32 @@
 <button id="sound-btn">🔇 Включить звук</button>
 
 <script>
-// НАСТРОЙКИ — меняй значения здесь
-const SETTINGS = {
-    firstAppearDelay: 5,    // Через сколько секунд после начала видео/цикла впервые показываем текст
-    visibleDuration: 13,       // Сколько секунд текст виден и мигает
-    pauseDuration: 30,         // НОВАЯ: через сколько секунд после исчезновения текст появится снова (пауза между появлениями)
-    blinkInterval: 1.5,       // Скорость мигания (меньше = быстрее)
-};
-
-// ────────────────────────────────────────────────
+// НАСТРОЙКИ — меняй здесь
+const TEXT_PHASES = [
+    { start: 5, duration: 13, text: "НЕ ОТКРЫВАЙТЕ\n🔥 СТРАННЫЕ ССЫЛКИ 🔥", blink: true  },
+    { start: 45, duration: 15, text: "🔥НЕ ТОРОПИТЕСЬ🔥\n Читайте, что вы делаете на экране", blink: true  },
+    { start: 80, duration: 20, text: "🔥ВНИМАНИЕ НА ДЕТАЛИ🔥\nДоменное имя сайта не должно содержать лишних символов или опечаток", blink: true },
+    { start: 120, duration: 20, text: "🔥РОДИНА СЛУШАЕТ🔥\nСкачивайте приложения только из официальных источников!\nИспользуйте только официальные сайты!", blink: true  },
+    { start: 160, duration: 20, text: "🔥НУЖНО БОЛЬШЕ ЗОЛОТА🔥\nИзбегайте совершения финансовых операций или передачи конфиденциальной информации при подключении к общедоступным Wi-Fi сетям", blink: true  },
+    { start: 200, duration: 13, text: "Включите двухфакторную аутентификацию везде, где это возможно. Никому и никогда не озвучивайте пароли и/или СМС-коды", blink: true  }
+];
 
 const video = document.getElementById('bg-video');
-const textOverlay = document.getElementById('overlay-text');  // Переименовали для ясности
+const overlay = document.getElementById('overlay-text');
 const soundBtn = document.getElementById('sound-btn');
 
-let isVisible = false;
-let videoDuration = 0;  // Будем хранить длительность видео для расчёта циклов
+let currentPhaseIndex = -1;
+let videoDuration = 0;  // Для расчёта циклов
 
-// Получаем длительность видео (для надёжного повторения)
+// Получаем длительность видео (основной обработчик)
 video.addEventListener('loadedmetadata', () => {
-    videoDuration = video.duration;
-    console.log('Длительность видео:', videoDuration);  // Для дебага в консоли
+    videoDuration = video.duration || 0;
+    console.log('Длительность видео (loadedmetadata):', videoDuration);
 });
 
-// Для надёжного loop (на случай, если атрибут loop не сработает идеально)
+// Для надёжного loop
 video.addEventListener('ended', () => {
     video.play();
-    console.log('Видео закончилось, перезапускаем');  // Дебаг
 });
 
 // Переключение звука
@@ -132,43 +131,48 @@ soundBtn.addEventListener('click', toggleSound);
 // Автоматически начинаем с выключенного звука
 video.muted = true;
 
-// Логика появления текста с повторением через паузу
-function updateText() {
+// Функция обновления текста
+function updateOverlay() {
     const t = video.currentTime;
-    console.log('Текущее время:', t);  // Дебаг: проверь в консоли (F12), что время меняется и сбрасывается
 
-    // Рассчитываем позицию в цикле (с учётом loop)
-    const cycleTime = videoDuration > 0 ? t % videoDuration : t;
-
-    // Полный интервал появления: visible + pause
-    const fullCycle = SETTINGS.visibleDuration + SETTINGS.pauseDuration;
-
-    // Проверяем, попадает ли время в окно видимости (с повторениями)
-    const positionInCycle = (cycleTime - SETTINGS.firstAppearDelay) % fullCycle;
-
-    if (positionInCycle >= 0 && positionInCycle < SETTINGS.visibleDuration) {
-        if (!isVisible) {
-            textOverlay.style.opacity = '1';
-            textOverlay.classList.add('blink');
-            // textOverlay.classList.add('fire');  // Если хочешь огонь
-            isVisible = true;
-            console.log('Текст показан на времени:', t);
+    // Динамически обновляем длительность, если ещё не получена (на случай задержек)
+    if (videoDuration === 0) {
+        videoDuration = video.duration || 0;
+        if (videoDuration > 0) {
+            console.log('Длительность видео (обновлено в update):', videoDuration);
         }
+    }
+
+    const cycleTime = videoDuration > 0 ? t % videoDuration : t;  // Для повторения в цикле
+
+    let activePhase = null;
+
+    // Ищем подходящую фазу
+    for (let i = TEXT_PHASES.length - 1; i >= 0; i--) {
+        const phase = TEXT_PHASES[i];
+        if (cycleTime >= phase.start && cycleTime < phase.start + phase.duration) {
+            activePhase = phase;
+            break;
+        }
+    }
+
+    if (activePhase) {
+        if (currentPhaseIndex !== TEXT_PHASES.indexOf(activePhase)) {
+            overlay.innerHTML = activePhase.text.replace(/\n/g, '<br>');
+            overlay.classList.toggle('blink', activePhase.blink);
+            currentPhaseIndex = TEXT_PHASES.indexOf(activePhase);
+        }
+        overlay.style.opacity = '1';
     } else {
-        if (isVisible) {
-            textOverlay.style.opacity = '0';
-            textOverlay.classList.remove('blink');
-            // textOverlay.classList.remove('fire');
-            isVisible = false;
-            console.log('Текст скрыт на времени:', t);
-        }
+        overlay.style.opacity = '0';
+        overlay.classList.remove('blink');  // Убираем класс мигания при скрытии (фикс возможного бага)
+        currentPhaseIndex = -1;
     }
 }
 
-// Обновляем на каждом изменении времени
-video.addEventListener('timeupdate', updateText);
+video.addEventListener('timeupdate', updateOverlay);
 
-// Принудительный запуск видео (на случай блокировки autoplay)
+// Принудительный запуск видео
 video.play().catch(error => {
     console.error('Ошибка autoplay:', error);
 });
@@ -176,6 +180,10 @@ video.play().catch(error => {
 // Для мобильных
 document.body.addEventListener('touchstart', () => video.play(), { once: true });
 
+// Дебаг: логируем время для проверки
+video.addEventListener('timeupdate', () => {
+    console.log('Время:', video.currentTime.toFixed(1));
+});
 </script>
 </body>
 </html>

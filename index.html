@@ -45,7 +45,7 @@
         }
 
         #overlay-text.blink {
-            animation: blink 1.5s infinite alternate;
+            animation: blink 1.2s infinite alternate;
         }
 
         @keyframes blink {
@@ -92,17 +92,34 @@
 <button id="sound-btn">🔇 Включить звук</button>
 
 <script>
-// НАСТРОЙКИ
+// НАСТРОЙКИ — меняй значения здесь
 const SETTINGS = {
-    firstAppearDelay: 5,
-    visibleDuration: 12,
+    firstAppearDelay: 5,    // Через сколько секунд после начала видео/цикла впервые показываем текст
+    visibleDuration: 15,       // Сколько секунд текст виден и мигает
+    pauseDuration: 30,         // НОВАЯ: через сколько секунд после исчезновения текст появится снова (пауза между появлениями)
+    blinkInterval: 1.5,       // Скорость мигания (меньше = быстрее)
 };
 
+// ────────────────────────────────────────────────
+
 const video = document.getElementById('bg-video');
-const text  = document.getElementById('overlay-text');
+const textOverlay = document.getElementById('overlay-text');  // Переименовали для ясности
 const soundBtn = document.getElementById('sound-btn');
 
 let isVisible = false;
+let videoDuration = 0;  // Будем хранить длительность видео для расчёта циклов
+
+// Получаем длительность видео (для надёжного повторения)
+video.addEventListener('loadedmetadata', () => {
+    videoDuration = video.duration;
+    console.log('Длительность видео:', videoDuration);  // Для дебага в консоли
+});
+
+// Для надёжного loop (на случай, если атрибут loop не сработает идеально)
+video.addEventListener('ended', () => {
+    video.play();
+    console.log('Видео закончилось, перезапускаем');  // Дебаг
+});
 
 // Переключение звука
 function toggleSound() {
@@ -110,40 +127,55 @@ function toggleSound() {
     soundBtn.textContent = video.muted ? '🔇 Включить звук' : '🔊 Выключить звук';
     soundBtn.style.background = video.muted ? 'rgba(0,0,0,0.7)' : '#ff4500';
 }
-
-// Клик по кнопке
 soundBtn.addEventListener('click', toggleSound);
 
 // Автоматически начинаем с выключенного звука
 video.muted = true;
 
-// Логика текста
+// Логика появления текста с повторением через паузу
 function updateText() {
     const t = video.currentTime;
-    if (t >= SETTINGS.firstAppearDelay && t < SETTINGS.firstAppearDelay + SETTINGS.visibleDuration) {
+    console.log('Текущее время:', t);  // Дебаг: проверь в консоли (F12), что время меняется и сбрасывается
+
+    // Рассчитываем позицию в цикле (с учётом loop)
+    const cycleTime = videoDuration > 0 ? t % videoDuration : t;
+
+    // Полный интервал появления: visible + pause
+    const fullCycle = SETTINGS.visibleDuration + SETTINGS.pauseDuration;
+
+    // Проверяем, попадает ли время в окно видимости (с повторениями)
+    const positionInCycle = (cycleTime - SETTINGS.firstAppearDelay) % fullCycle;
+
+    if (positionInCycle >= 0 && positionInCycle < SETTINGS.visibleDuration) {
         if (!isVisible) {
-            text.style.opacity = '1';
-            text.classList.add('blink');
+            textOverlay.style.opacity = '1';
+            textOverlay.classList.add('blink');
+            // textOverlay.classList.add('fire');  // Если хочешь огонь
             isVisible = true;
+            console.log('Текст показан на времени:', t);
         }
     } else {
         if (isVisible) {
-            text.style.opacity = '0';
-            text.classList.remove('blink');
+            textOverlay.style.opacity = '0';
+            textOverlay.classList.remove('blink');
+            // textOverlay.classList.remove('fire');
             isVisible = false;
+            console.log('Текст скрыт на времени:', t);
         }
     }
 }
 
+// Обновляем на каждом изменении времени
 video.addEventListener('timeupdate', updateText);
 
-// Принудительный запуск (на случай блокировки autoplay)
-video.play().catch(() => {
-    // Если браузер блокирует, кнопка всё равно будет работать
+// Принудительный запуск видео (на случай блокировки autoplay)
+video.play().catch(error => {
+    console.error('Ошибка autoplay:', error);
 });
 
-// Мобильные тач
+// Для мобильных
 document.body.addEventListener('touchstart', () => video.play(), { once: true });
+
 </script>
 </body>
 </html>
